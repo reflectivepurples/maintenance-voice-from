@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Maintenance Voice Form</title>
+</head>
+<body>
+  <h1>Maintenance Report Assistant</h1>
+  <button id="startBtn">Start Form</button>
+  <p id="status"></p>
+
+  <script>
+    const questions = [
+      "What is the job number?",
+      "What kind of maintenance was performed?",
+      "How long did the job take?",
+      "Any additional comments?"
+    ];
+
+    let answers = [];
+    let current = 0;
+
+    const speak = (text) => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      speechSynthesis.speak(utterance);
+    };
+
+    const askNext = () => {
+      if (current < questions.length) {
+        speak(questions[current]);
+        document.getElementById("status").textContent = questions[current];
+        listen();
+      } else {
+        speak("Thank you. Generating your PDF report.");
+        document.getElementById("status").textContent = "Generating PDF...";
+        fetch("/.netlify/functions/generate-pdf", {
+          method: "POST",
+          body: JSON.stringify({ answers }),
+        })
+        .then(res => res.blob())
+        .then(blob => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "maintenance_report.pdf";
+          link.click();
+        });
+      }
+    };
+
+    const listen = () => {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = "en-US";
+      recognition.start();
+
+      recognition.onresult = (event) => {
+        const answer = event.results[0][0].transcript;
+        answers.push({ question: questions[current], answer });
+        current++;
+        recognition.stop();
+        setTimeout(askNext, 1000);
+      };
+    };
+
+    document.getElementById("startBtn").addEventListener("click", () => {
+      current = 0;
+      answers = [];
+      askNext();
+    });
+  </script>
+</body>
+</html>
